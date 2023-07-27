@@ -6,7 +6,7 @@
 - Скрипт DDL для создания таблицы: <code>[./postgres_data/DDL/init.sql](https://github.com/AlexeyAnanchenko/airflow_raw_store/blob/main/postgres_data/DDL/01_init.sql)</code>.
 - DAG для Airflow: <code>[./dags/raw_store.py](https://github.com/AlexeyAnanchenko/airflow_raw_store/blob/main/dags/raw_store.py)</code>.
 - Скриншоты DAG-а и полученной витрины данных: <code>[./screenshots/](https://github.com/AlexeyAnanchenko/airflow_raw_store/blob/main/screenshots/)</code>.
--  docker-compose.yml для разворачивания проекта (добавлен дополнительный том в Airflow "raw_data" и БД PostgreSQL): <code>[./docker-compose.yml](https://github.com/AlexeyAnanchenko/airflow_raw_store/blob/main/docker-compose.yml)</code>.
+-  docker-compose.yml для разворачивания проекта (добавлен дополнительный том в Airflow "raw_data" и БД PostgreSQL): <code>[./docker-compose.yml](https://github.com/AlexeyAnanchenko/airflow_raw_store/blob/main/docker-compose.yaml)</code>.
 
 ## Как развернуть проект?
 
