@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS public.raw_store (
+    "Row ID" INT PRIMARY KEY,
+    "Order ID" VARCHAR(20),
+    "Order Date" DATE,
+    "Ship Date" DATE,
+    "Ship Mode" VARCHAR(100),
+    "Customer ID" VARCHAR(20),
+    "Customer Name" VARCHAR(100),
+    "Segment" VARCHAR(20),
+    "Country" VARCHAR(30),
+    "City" VARCHAR(30),
+    "State" VARCHAR(30),
+    "Postal Code" INT,
+    "Region" VARCHAR(20),
+    "Product ID" VARCHAR(20),
+    "Category" VARCHAR(40),
+    "Sub-Category" VARCHAR(40),
+    "Product Name" VARCHAR(200),
+    "Sales" NUMERIC(10, 2),
+    "Quantity" INT,
+    "Discount" NUMERIC(2, 2),
+    "Profit" NUMERIC(10, 4)
+);
