@@ -1,8 +1,8 @@
 CREATE TABLE IF NOT EXISTS public.raw_store (
     "Row ID" INT PRIMARY KEY,
     "Order ID" VARCHAR(20),
-    "Order Date" DATE,
-    "Ship Date" DATE,
+    "Order Date" VARCHAR(10),
+    "Ship Date" VARCHAR(10),
     "Ship Mode" VARCHAR(100),
     "Customer ID" VARCHAR(20),
     "Customer Name" VARCHAR(100),
