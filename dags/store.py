@@ -11,6 +11,7 @@ from airflow.providers.postgres.operators.postgres import PostgresOperator
 
 import os
 import csv
+import json
 import requests
 from psycopg2 import connect
 from urllib.parse import urlencode
@@ -19,169 +20,6 @@ from urllib.parse import urlencode
 DIR_PATH = f'{Variable.get("RAW_DATA")}'
 SUPERMARKET_PATH = f'{DIR_PATH}/supermarket_1'
 RAW_DATA_PATH = f'{SUPERMARKET_PATH}/Sample_Superstore.csv'
-QUERY_DM_TEMPLATE = lambda category: f"""
-        SELECT sc.sub_category_title, SUM(sum_of_sale) AS total_sales_in_2015
-        FROM sales_store AS ss
-            JOIN product AS p ON ss.product_id = p.product_id
-            JOIN sub_category AS sc ON p.sub_category_id = sc.sub_category_id
-            JOIN category AS c ON sc.category_id = c.category_id
-            JOIN customer AS cs ON cs.customer_id = ss.customer_id
-            JOIN segment AS s ON s.segment_id = cs.segment_id
-            JOIN order_store AS os ON os.order_id = ss.order_id
-            JOIN date_conversion AS dc ON dc.date_id = os.date_id
-        WHERE s.segment_title = 'Corporate' AND dc."year" = 2015
-                                            AND c.category_name = '{category}'
-        GROUP BY sc.sub_category_title
-        ORDER BY sc.sub_category_title;
-"""
-
-table_quries = {
-    'date_conversion': """
-        SELECT d.date_origin,
-                EXTRACT(DAY FROM d.date_origin) AS "day",
-                EXTRACT(MONTH FROM d.date_origin) AS "month",
-                EXTRACT(YEAR FROM d.date_origin) AS "year",
-                EXTRACT(QUARTER FROM d.date_origin) AS "quarter",
-                EXTRACT(ISODOW FROM d.date_origin) AS day_of_week,
-                EXTRACT(WEEK FROM d.date_origin) AS "week"
-        FROM (
-            SELECT DISTINCT "Order Date" AS date_origin FROM raw_store
-            UNION
-            SELECT DISTINCT "Ship Date" AS date_origin FROM raw_store
-        ) AS d
-        ORDER BY d.date_origin;
-    """,
-    'order_store': """
-        SELECT DISTINCT rs."Order ID" AS order_id_from_raw,
-                        dc.date_id
-        FROM raw_store AS rs
-        JOIN date_conversion AS dc ON rs."Order Date" = dc.date_origin
-        ORDER BY order_id_from_raw;
-    """,
-    'ship_mode': """
-        SELECT DISTINCT "Ship Mode" AS mode_title FROM raw_store;
-    """,
-    'shipment': """
-        SELECT DISTINCT dc.date_id, sm.mode_id
-        FROM raw_store AS rs
-        JOIN date_conversion AS dc ON rs."Ship Date" = dc.date_origin
-        JOIN ship_mode AS sm ON rs."Ship Mode" = sm.mode_title
-        ORDER BY dc.date_id DESC;
-    """,
-    'segment': """
-        SELECT DISTINCT rs."Segment" AS segment_title
-        FROM raw_store AS rs;
-    """,
-    'customer': """
-        SELECT DISTINCT rs."Customer ID" AS customer_id_from_raw,
-                        rs."Customer Name" AS customer_name,
-                        s.segment_id
-        FROM raw_store AS rs
-        JOIN segment AS s ON s.segment_title = rs."Segment"
-        ORDER BY customer_id_from_raw;
-    """,
-    'category': """
-        SELECT DISTINCT rs."Category" AS category_name
-        FROM raw_store AS rs;
-    """,
-    'sub_category': """
-        SELECT DISTINCT rs."Sub-Category" AS sub_category_title, c.category_id
-        FROM raw_store AS rs
-        JOIN category AS c ON rs."Category" = c.category_name;
-    """,
-    'product': """
-        WITH
-        price AS (
-            SELECT rs."Product ID",
-                rs."Product Name",
-                ROUND(AVG(rs.price), 2) AS price
-            FROM (
-                SELECT rs."Product ID",
-                    rs."Product Name",
-                    ROUND(
-                        (rs."Sales" / (1.00 - rs."Discount")) / rs."Quantity",
-                        2
-                    ) AS price
-                FROM raw_store AS rs
-            ) AS rs
-            GROUP BY rs."Product ID", rs."Product Name"
-        )
-
-        SELECT DISTINCT rs."Product ID" AS product_id_from_raw,
-                        rs."Product Name" AS product_name,
-                        sc.sub_category_id,
-                        pr.price
-        FROM raw_store AS rs
-        JOIN sub_category AS sc ON rs."Sub-Category" = sc.sub_category_title
-        JOIN price AS pr ON rs."Product ID" = pr."Product ID"
-                            AND rs."Product Name" = pr."Product Name";
-    """,
-    'country': """
-        SELECT DISTINCT rs."Country" AS country_title FROM raw_store rs;
-    """,
-    'region': """
-        SELECT DISTINCT rs."Region" AS region_title, c.country_id
-        FROM raw_store AS rs
-        JOIN country AS c ON rs."Country" = c.country_title;
-    """,
-    'state': """
-        SELECT DISTINCT rs."State" AS state_title, r.region_id
-        FROM raw_store AS rs
-        JOIN region AS r ON rs."Region" = r.region_title
-        ORDER BY 1;
-    """,
-    'city': """
-        SELECT DISTINCT rs."City" AS city_title, s.state_id
-        FROM raw_store AS rs
-        JOIN state AS s ON rs."State" = s.state_title
-        ORDER BY 1;
-    """,
-    'postal_code': """
-        SELECT DISTINCT rs."Postal Code" AS postal_code, c.city_id
-        FROM raw_store AS rs
-        JOIN (
-            SELECT c.city_id, c.city_title, c.state_id, s.state_title
-            FROM city AS c
-            JOIN state AS s ON c.state_id = s.state_id
-        ) AS c ON rs."City" = c.city_title AND c.state_title = rs."State"
-        ORDER BY 1;
-    """,
-    'sales_store': """
-        WITH
-        sales AS (
-            SELECT os.order_id, sh.shipment_id, cu.customer_id,
-                   ps.postal_code_id, pr.product_id, rs."Sales" AS sum_of_sale,
-                   rs."Quantity" AS quantity, rs."Discount" AS discount,
-                   rs."Profit" AS profit,
-                   pr.price * rs."Quantity" AS sum_by_price
-            FROM raw_store AS rs
-            JOIN order_store AS os ON rs."Order ID" = os.order_id_from_raw
-            JOIN (
-                SELECT s.shipment_id, s.date_id, dc.date_origin, sm.mode_title
-                FROM shipment AS s
-                JOIN date_conversion AS dc ON s.date_id = dc.date_id
-                JOIN ship_mode AS sm ON s.mode_id = sm.mode_id
-            ) AS sh ON rs."Ship Date" = sh.date_origin
-                       AND rs."Ship Mode" = sh.mode_title
-            JOIN customer AS cu ON rs."Customer ID" = cu.customer_id_from_raw
-            JOIN postal_code AS ps ON rs."Postal Code" = ps.postal_code
-            JOIN product AS pr ON rs."Product ID" = pr.product_id_from_raw
-                                  AND rs."Product Name" = pr.product_name
-        )
-
-        SELECT order_id, shipment_id, customer_id, postal_code_id, product_id,
-            SUM(sum_of_sale) AS sum_of_sale,
-            SUM(quantity) AS quantity,
-            ROUND(
-                (SUM(sum_by_price) - SUM(sum_of_sale)) / SUM(sum_by_price),
-                2
-            ) AS discount,
-            SUM(profit) AS profit
-        FROM sales
-        GROUP BY order_id, shipment_id, customer_id, postal_code_id, product_id
-        ORDER BY order_id;
-    """
-}
 
 
 def download_csv():
@@ -270,7 +108,7 @@ def load_data_by_psycopg2(table_name, connection, headers, data):
         cursor = connection.cursor()
 
         # удалим сначала всё содержимое таблицы
-        if table_name == Variable.get('TABLE_NAME'):
+        if table_name == Variable.get('RAW_TABLE_NAME'):
             cursor.execute(f"DELETE FROM {table_name};")
 
         # далее загружаем в базу
@@ -301,7 +139,7 @@ def load_raw_data():
 
     # считывааем и загружаем данные
     headers, data = read_csv(RAW_DATA_PATH)
-    table_name = Variable.get('TABLE_NAME')
+    table_name = Variable.get('RAW_TABLE_NAME')
     # сначала очистим таблицу
     conn = clean_table(conn, [table_name])
     # потом загрузим свежие данные
@@ -313,7 +151,7 @@ def migrate_data():
     """Перенос таблицы из raw_store в core_store"""
 
     conn = get_connect('raw_store')
-    table_name = Variable.get('TABLE_NAME')
+    table_name = Variable.get('RAW_TABLE_NAME')
     query = (f"SELECT * FROM {table_name} AS rs WHERE "
              "rs.\"Segment\" = 'Corporate';")
     headers, data = select_data(conn, query)
@@ -327,14 +165,18 @@ def migrate_data():
 def load_core_data():
     """Наполнение обновлёнными данными core-слоя"""
 
-    # получим соединие и очистим таблицы
+    # Получаем значение переменной и преобразуем его в словарь
+    sql_queries_json = Variable.get("TABLE_QUERY_CORE")
+    table_queries_core = json.loads(sql_queries_json)
+
+    # получим соединие и очистим таблицы в БД
     conn = clean_table(
         get_connect('core_store'),
-        list(table_quries.keys())[::-1]
+        list(table_queries_core.keys())[::-1]
     )
 
     # для каждой таблицы последовательно получим выборку и зальём в core-слой
-    for table, query in table_quries.items():
+    for table, query in table_queries_core.items():
         headers, data = select_data(conn, query)
         conn = load_data_by_psycopg2(table, conn, headers, data)
 
@@ -359,17 +201,7 @@ def create_data_mart(query, table_name):
 def create_data_mart_by_year():
     """Витрина данных по продажам в разрезе категорий и лет"""
 
-    query = """
-        SELECT dc."year", c.category_name, SUM(ss.sum_of_sale) AS sum_of_sale
-        FROM sales_store AS ss
-        JOIN order_store AS os ON ss.order_id = os.order_id
-        JOIN date_conversion AS dc ON os.date_id = dc.date_id
-        JOIN product AS p ON ss.product_id = p.product_id
-        JOIN sub_category AS sc ON p.sub_category_id = sc.sub_category_id
-        JOIN category AS c ON c.category_id = sc.category_id
-        GROUP BY dc."year", c.category_name
-        ORDER BY dc."year", c.category_name;
-    """
+    query = Variable.get("QUERY_DM_1")
     create_data_mart(query, 'sales_by_year')
 
 
@@ -446,7 +278,6 @@ def get_technology_sales(**kwargs):
 
 
 default_args = {
-    'owner': 'alexey',
     'retries': 1,  # сколько перезапусков можно после первой ошибки при запуске
     'retry_delay': 60,  # через сколько секунд перезапускать даг
     'start_date': datetime(2022, 7, 26),
