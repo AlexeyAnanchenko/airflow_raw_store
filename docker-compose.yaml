@@ -78,6 +78,7 @@ x-airflow-common:
     - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
     - ${AIRFLOW_PROJ_DIR:-.}/raw_data:/opt/airflow/raw_data
+    - ${AIRFLOW_PROJ_DIR:-.}/raw_data:/opt/airflow/bash_scripts
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
@@ -168,7 +169,7 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
-  postgres-data:
+  postgres-raw:
     image: postgres:latest
     ports:
       - 5434:5432
@@ -177,7 +178,29 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: raw_store
     volumes:
-      - ./postgres_data/DDL/01_init.sql:/docker-entrypoint-initdb.d/01_init.sql
+      - ./postgres_data/DDL/01_init_raw_store.sql:/docker-entrypoint-initdb.d/01_init_raw_store.sql
+
+  postgres-core:
+    image: postgres:latest
+    ports:
+      - 5430:5432
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: core_store
+    volumes:
+      - ./postgres_data/DDL/02_init_core_store.sql:/docker-entrypoint-initdb.d/02_init_core_store.sql
+
+  postgres-mart:
+    image: postgres:latest
+    ports:
+      - 5436:5432
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mart_store
+    volumes:
+      - ./postgres_data/DDL/03_init_mart_store.sql:/docker-entrypoint-initdb.d/03_init_mart_store.sql
 
   airflow-triggerer:
     <<: *airflow-common
