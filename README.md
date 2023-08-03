@@ -25,7 +25,7 @@
 - Вспомогательный DAG для создания переменны и подключений: <code>[./dags/set_var_and_conn.py](https://github.com/AlexeyAnanchenko/airflow_raw_store/blob/main/dags/set_var_and_conn.py)</code>.
 - Основной DAG для Airflow: <code>[./dags/store.py](https://github.com/AlexeyAnanchenko/airflow_raw_store/blob/main/dags/store.py)</code>.
 - Скриншоты DAG-а и полученных витрин данных: <code>[./screenshots/](https://github.com/AlexeyAnanchenko/airflow_raw_store/blob/main/screenshots/)</code>.
--  docker-compose.yml для разворачивания проекта (добавлен дополнительный том в Airflow "raw_data" и 3 БД PostgreSQL): <code>[./docker-compose.yml](https://github.com/AlexeyAnanchenko/airflow_raw_store/blob/main/docker-compose.yml)</code>.
+-  docker-compose.yml для разворачивания проекта (добавлен дополнительный том в Airflow "raw_data" и 3 БД PostgreSQL): <code>[./docker-compose.yml](https://github.com/AlexeyAnanchenko/airflow_store/blob/main/docker-compose.yaml)</code>.
 -  ER-диаграмма со структурой DWH: <code>[./ER-diagram.png](https://github.com/AlexeyAnanchenko/airflow_raw_store/blob/main/ER-diagram.png)</code>.
 
 ## Как развернуть проект?
